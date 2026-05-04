@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Upload Grid</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { margin: 0; background: #f4f6f8; color: #222; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .header h1 { text-align: center; margin: 0; font-size: 28px; }
+    h1 { text-align: center; margin-bottom: 32px; font-size: 28px; }
+    .subtitle { text-align: center; margin-bottom: 10px; color: #666; font-size: 15px; }
+    .note { text-align: center; margin-bottom: 24px; color: #555; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+    .upload-box {
+      position: relative;
+      width: 100%;
+      background: #fff;
+      border: 2px dashed #b8c0cc;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-section {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .bottom-section {
+      border-top: 1px solid #e5e7eb;
+      padding: 10px 6px;
+      background: #f9fafb;
+    }
+      transition: 0.2s;
+    }
+
+    .image-area {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      background: #fff;
+    }
+    .upload-box:hover { border-color: #111; transform: translateY(-2px); }
+    .upload-box input { display: none; }
+    .number, .version-label {
+      position: absolute; background: rgba(0,0,0,.72); color: #fff;
+      padding: 4px 8px; border-radius: 999px; font-size: 12px; z-index: 5;
+    }
+    .number { top: 8px; right: 8px; }
+    .version-label { bottom: 8px; left: 50%; transform: translateX(-50%); display: none; }
+
+    .upload-btn, .remove-btn, .prev-version, .next-version {
+      position: absolute; border: none; color: #fff; border-radius: 999px;
+      padding: 5px 9px; cursor: pointer; font-size: 12px; z-index: 10;
+    }
+    .upload-btn { bottom: 8px; right: 52px; background: rgba(37,99,235,.95); }
+    .remove-btn { bottom: 8px; right: 8px; background: rgba(220,38,38,.95); display: none; }
+    .prev-version { bottom: 8px; left: 8px; background: rgba(17,24,39,.85); display: none; }
+    .next-version { bottom: 8px; right: 8px; background: rgba(17,24,39,.85); display: none; }
+
+    .placeholder {
+      position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; text-align: center; color: #777; font-size: 14px; padding: 10px;
+      z-index: 2; pointer-events: none;
+    }
+    .preview-img {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      display: none; z-index: 1; pointer-events: none;
+    }
+    .has-image { cursor: zoom-in; }
+
+    .status-tracker {
+      background: #f8fafc;
+      border-top: 1px solid #e5e7eb;
+      padding: 14px 8px 18px;
+      margin-top: 12px;
+      cursor: default;
+    }
+
+    .status-title {
+      font-size: 11px;
+      color: #374151;
+      margin-bottom: 6px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .status-line {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px 6px; /* ลดระยะห่าง */
+      padding: 10px 4px 6px;
+      justify-items: stretch; /* ให้เต็มช่อง */
+      align-items: center;
+      text-align: center;
+      max-width: 100%;
+      margin: 0;
+    }
+
+    /* จัดแถวสุดท้าย (1 ช่อง) ให้อยู่กลาง */
+    .status-step:nth-child(10) {
+      grid-column: 2 / 3;
+      justify-self: center;
+    }
+.status-step {
+      width: 100%; /* เต็มช่อง */
+      border: 2px solid #cbd5e1;
+      background: #fff;
+      color: #475569;
+      border-radius: 999px;
+      padding: 6px 6px;
+      font-size: 10px;
+      cursor: pointer;
+      line-height: 1.1;
+      position: relative;
+      transition: 0.2s;
+      z-index: 1;
+      min-height: 34px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    }
+
+    /* ลูกศรเชื่อมสถานะ แบบวิ่ง */
+    .status-step::after {
+      content: '→';
+      position: absolute;
+      right: -14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 14px;
+      font-weight: 700;
+      pointer-events: none;
+      animation: arrowFlow 1s infinite ease-in-out;
+    }
+
+    .status-step.done::after,
+    .status-step.active::after {
+      color: #16a34a;
+      text-shadow: 0 0 6px rgba(34,197,94,.55);
+    }
+
+    .status-step:last-child::after {
+      content: '';
+      animation: none;
+    }
+
+    @keyframes arrowFlow {
+      0% { opacity: .25; transform: translate(-4px, -50%); }
+      50% { opacity: 1; transform: translate(2px, -50%); }
+      100% { opacity: .25; transform: translate(6px, -50%); }
+    }
+
+    .status-step span {
+      position: absolute;
+      top: 34px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      white-space: nowrap;
+      color: #444;
+    }
+
+    .status-step.active {
+      background: #22c55e;
+      border-color: #16a34a;
+    }
+
+    .status-step.done {
+      background: #22c55e;
+      border-color: #16a34a;
+    }
+
+    .status-step.done::before {
+      content: '✓ ';
+      font-weight: 700;
+    }
+
+    .delete-modal, .text-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none;
+      align-items: center; justify-content: center; z-index: 25000; padding: 16px;
+    }
+    .delete-modal-box, .text-modal-box {
+      width: 100%; max-width: 380px; background: #fff; color: #111; border-radius: 16px; padding: 22px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.25); text-align: center;
+    }
+    .delete-modal-box h2, .text-modal-box h2 { margin: 0 0 10px; font-size: 20px; }
+    .delete-modal-box p { margin: 0 0 14px; color: #666; font-size: 14px; }
+    .delete-modal-box input, .text-modal-box input {
+      width: 100%; padding: 12px; border: 1px solid #cfd6df; border-radius: 10px;
+      font-size: 16px; text-align: center; outline: none; margin-bottom: 12px;
+    }
+    .delete-modal-actions, .text-actions { display: flex; gap: 10px; }
+    .confirm-delete, .cancel-delete, .add-text-confirm, .add-text-cancel {
+      flex: 1; border: none; border-radius: 10px; padding: 11px; cursor: pointer;
+      font-size: 14px; color: #fff;
+    }
+    .confirm-delete { background: #dc2626; }
+    .cancel-delete, .add-text-cancel { background: #6b7280; }
+    .add-text-confirm { background: #2563eb; }
+    .delete-error { min-height: 18px; color: #dc2626; font-size: 13px; margin-bottom: 10px; }
+
+    .editor {
+      position: fixed; inset: 0; background: rgba(0,0,0,.96); display: none;
+      z-index: 9999; overflow: hidden; color: #fff;
+    }
+    .editor-toolbar {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      background: rgba(255,255,255,.12); padding: 8px; border-radius: 14px; z-index: 10002;
+      max-width: calc(100% - 90px);
+    }
+    .editor-toolbar button, .close-editor {
+      border: none; background: rgba(255,255,255,.22); color: #fff; padding: 8px 11px;
+      border-radius: 9px; cursor: pointer; font-size: 14px;
+    }
+    .editor-toolbar button:disabled { opacity: .35; cursor: not-allowed; }
+    .editor-toolbar button.active { background: #2563eb; }
+    .editor-toolbar button.save-btn { background: #16a34a; }
+    .editor-toolbar button.clear-btn { background: #dc2626; }
+    .editor-toolbar button.zip-btn { background: #9333ea; }
+    .editor-toolbar input[type="color"] { width: 36px; height: 34px; border: none; border-radius: 8px; padding: 0; cursor: pointer; }
+    .editor-toolbar input[type="range"] { width: 90px; }
+    .zoom-text { min-width: 50px; text-align: center; font-size: 14px; }
+    .close-editor { position: absolute; top: 12px; right: 16px; z-index: 10003; }
+    .canvas-wrap {
+      position: absolute; inset: 72px 18px 104px; display: flex; align-items: center;
+      justify-content: center; overflow: hidden;
+    }
+    #editCanvas {
+      max-width: 100%; max-height: 100%; background: #fff; box-shadow: 0 0 30px rgba(0,0,0,.45);
+      cursor: grab; transform-origin: center center;
+    }
+    #editCanvas.draw-mode { cursor: crosshair; }
+    #editCanvas.text-mode { cursor: text; }
+    #editCanvas.move-tool-mode { cursor: move; }
+    
+
+    .version-strip {
+      position: absolute; left: 18px; right: 18px; bottom: 14px; height: 78px;
+      display: flex; gap: 10px; align-items: center; overflow-x: auto;
+      background: rgba(255,255,255,.11); padding: 9px; border-radius: 14px; z-index: 10002;
+    }
+    .version-thumb {
+      min-width: 78px; width: 78px; height: 58px; border: 2px solid transparent; border-radius: 10px;
+      overflow: hidden; position: relative; cursor: pointer; background: #fff;
+    }
+    .version-thumb.active { border-color: #22c55e; }
+    .version-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .version-thumb span {
+      position: absolute; left: 4px; bottom: 4px; background: rgba(0,0,0,.72); color: #fff;
+      font-size: 11px; border-radius: 999px; padding: 2px 6px;
+    }
+
+    @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) {
+      .grid { grid-template-columns: 1fr; }
+      .container { padding: 14px; }
+      .editor-toolbar { left: 8px; right: 55px; transform: none; max-width: none; overflow-x: auto; flex-wrap: nowrap; }
+      .canvas-wrap { inset: 126px 8px 104px; }
+      .close-editor { right: 8px; }
+      .version-strip { left: 8px; right: 8px; }
+    }
+  
+      
+
+  </style>
+</head>
+<body>
+    
+  <div class="container">
+    <h1>Worksheet Double B Sport</h1>
+    <div class="grid" id="uploadGrid"></div>
+  </div>
+
+  <div class="delete-modal" id="uploadModal">
+    <div class="delete-modal-box">
+      <h2>ใส่รหัสเพื่อดำเนินการต่อ</h2>
+      <p>กรุณาใส่รหัสเพื่อดำเนินการต่อ</p>
+      <input type="password" id="uploadPasswordInput" placeholder="ใส่รหัส" autocomplete="off">
+      <div class="delete-error" id="uploadError"></div>
+      <div class="delete-modal-actions">
+        <button type="button" class="cancel-delete" id="cancelUpload">ยกเลิก</button>
+        <button type="button" class="confirm-delete" id="confirmUpload">ยืนยัน</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="delete-modal" id="deleteModal">
+    <div class="delete-modal-box">
+      <h2>ใส่รหัสเพื่อดำเนินการต่อ</h2>
+      <p>กรุณาใส่รหัสเพื่อดำเนินการต่อ</p>
+      <input type="password" id="deletePasswordInput" placeholder="ใส่รหัส" autocomplete="off">
+      <div class="delete-error" id="deleteError"></div>
+      <div class="delete-modal-actions">
+        <button type="button" class="cancel-delete" id="cancelDelete">ยกเลิก</button>
+        <button type="button" class="confirm-delete" id="confirmDelete">ยืนยันลบ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="editor" id="editorView">
+    <div class="editor-toolbar">
+      <button type="button" id="moveTool">↖️ Move Tool</button>
+      <button type="button" id="drawMode">✏️ ปากกา</button>
+      <button type="button" id="textMode">🔤 อักษร</button>
+            <button type="button" id="undoEdit">ย้อนกลับ</button>
+      <button type="button" id="redoEdit">ไปข้างหน้า</button>
+      <input type="color" id="colorPicker" value="#ff0000" title="เลือกสี">
+      <input type="range" id="sizePicker" min="2" max="80" value="8" title="ขนาดเส้น/ตัวอักษร">
+      <select id="fontFamily">
+        <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+        <option value="Tahoma, Arial, sans-serif">Tahoma</option>
+        <option value="'Noto Sans Thai', Tahoma, sans-serif">Noto Sans Thai</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px">
+        <input type="checkbox" id="strokeToggle"> ขอบ
+      </label>
+      <input type="range" id="strokeWidth" min="0" max="10" value="0" title="ขนาดขอบ">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px">
+        <input type="checkbox" id="shadowToggle"> เงา
+      </label>
+      <button type="button" id="zoomOut">-</button>
+      <div class="zoom-text" id="zoomText">100%</div>
+      <button type="button" id="zoomIn">+</button>
+      <button type="button" id="resetZoom">รีเซ็ต</button>
+      <button type="button" class="clear-btn" id="clearEdit">ล้างแก้ไข</button>
+      <button type="button" class="zip-btn" id="downloadZip">โหลด ZIP</button>
+      <button type="button" class="save-btn" id="saveEdit">บันทึกเป็นภาพใหม่</button>
+    </div>
+    <button class="close-editor" id="closeEditor">ปิด</button>
+    <div class="canvas-wrap"><canvas id="editCanvas"></canvas></div>
+    <div class="version-strip" id="versionStrip"></div>
+  </div>
+
+  <div class="text-modal" id="textModal">
+    <div class="text-modal-box">
+      <h2>พิมพ์ข้อความ</h2>
+      <input type="text" id="textInput" placeholder="พิมพ์ข้อความที่ต้องการ">
+      <div class="text-actions">
+        <button type="button" class="add-text-cancel" id="cancelText">ยกเลิก</button>
+        <button type="button" class="add-text-confirm" id="confirmText">เพิ่มข้อความ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const uploadGrid = document.getElementById('uploadGrid');
+    const editorView = document.getElementById('editorView');
+    const editCanvas = document.getElementById('editCanvas');
+    const ctx = editCanvas.getContext('2d');
+    const closeEditor = document.getElementById('closeEditor');
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+    const resetZoomBtn = document.getElementById('resetZoom');
+    const zoomText = document.getElementById('zoomText');
+    const moveToolBtn = document.getElementById('moveTool');
+    const drawModeBtn = document.getElementById('drawMode');
+    const textModeBtn = document.getElementById('textMode');
+        const undoEdit = document.getElementById('undoEdit');
+    const redoEdit = document.getElementById('redoEdit');
+    const colorPicker = document.getElementById('colorPicker');
+    const sizePicker = document.getElementById('sizePicker');
+    const fontFamily = document.getElementById('fontFamily');
+    const strokeToggle = document.getElementById('strokeToggle');
+    const strokeWidth = document.getElementById('strokeWidth');
+    const shadowToggle = document.getElementById('shadowToggle');
+    const saveEdit = document.getElementById('saveEdit');
+    const clearEdit = document.getElementById('clearEdit');
+    const downloadZip = document.getElementById('downloadZip');
+    const versionStrip = document.getElementById('versionStrip');
+
+    const uploadModal = document.getElementById('uploadModal');
+    const uploadPasswordInput = document.getElementById('uploadPasswordInput');
+    const uploadError = document.getElementById('uploadError');
+    const cancelUpload = document.getElementById('cancelUpload');
+    const confirmUpload = document.getElementById('confirmUpload');
+
+    const deleteModal = document.getElementById('deleteModal');
+    const deletePasswordInput = document.getElementById('deletePasswordInput');
+    const deleteError = document.getElementById('deleteError');
+    const cancelDelete = document.getElementById('cancelDelete');
+    const confirmDelete = document.getElementById('confirmDelete');
+
+    const textModal = document.getElementById('textModal');
+    const textInput = document.getElementById('textInput');
+    const cancelText = document.getElementById('cancelText');
+    const confirmText = document.getElementById('confirmText');
+
+    const totalBoxes = 40;
+    const maxFileSize = 10 * 1024 * 1024;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const deletePassword = '0010';
+    let uploadUnlocked = false;
+    let pendingUploadInput = null;
+
+    let deleteUnlocked = false;
+    let pendingDelete = null;
+    let currentEdit = null;
+    let originalEditSrc = '';
+    let mode = 'move';
+    let zoomLevel = 1;
+    let moveX = 0;
+    let moveY = 0;
+    let isDragging = false;
+    let isDrawing = false;
+    let startX = 0;
+    let startY = 0;
+    let pendingTextPoint = null;
+    let historyStack = [];
+    let historyIndex = -1;
+    let canvasBaseImage = null;
+    let textObjects = [];
+    let selectedTextIndex = -1;
+    let isMovingText = false;
+    let textOffsetX = 0;
+    let textOffsetY = 0;
+    let isResizingText = false;
+    let resizeHandle = '';
+    let resizeStartY = 0;
+    let resizeStartSize = 0;
+
+    function setMode(newMode) {
+      mode = newMode;
+      moveToolBtn.classList.toggle('active', mode === 'moveTool');
+      drawModeBtn.classList.toggle('active', mode === 'draw');
+      textModeBtn.classList.toggle('active', mode === 'text');
+            editCanvas.classList.toggle('draw-mode', mode === 'draw');
+      editCanvas.classList.toggle('text-mode', mode === 'text');
+      editCanvas.classList.toggle('move-tool-mode', mode === 'moveTool');
+          }
+
+    function updateZoom() {
+      editCanvas.style.transform = `translate(${moveX}px, ${moveY}px) scale(${zoomLevel})`;
+      zoomText.textContent = Math.round(zoomLevel * 100) + '%';
+    }
+    function resetZoom() { zoomLevel = 1; moveX = 0; moveY = 0; updateZoom(); }
+    function zoomIn() { zoomLevel = Math.min(zoomLevel + 0.25, 5); updateZoom(); }
+    function zoomOut() { zoomLevel = Math.max(zoomLevel - 0.25, 0.5); if (zoomLevel <= 1) { moveX = 0; moveY = 0; } updateZoom(); }
+
+    function redrawCanvas() {
+      if (!canvasBaseImage) return;
+      ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+      ctx.drawImage(canvasBaseImage, 0, 0);
+
+      textObjects.forEach((item, index) => {
+        ctx.fillStyle = item.color;
+        ctx.font = item.font;
+        ctx.textBaseline = 'top';
+        ctx.save();
+        ctx.translate(item.x, item.y);
+        ctx.rotate((item.rotation||0) * Math.PI/180);
+        ctx.fillStyle = item.color;
+        ctx.font = item.font;
+        ctx.textBaseline = 'top';
+        if (item.shadow) {
+          ctx.shadowColor = 'rgba(0,0,0,0.4)';
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+        if (item.stroke && item.strokeWidth>0) {
+          ctx.lineWidth = item.strokeWidth;
+          ctx.strokeStyle = '#000';
+          ctx.strokeText(item.text, 0, 0);
+        }
+        ctx.fillText(item.text, 0, 0);
+        ctx.restore();
+
+        if (index === selectedTextIndex) {
+          const width = ctx.measureText(item.text).width;
+          const height = item.size * 3;
+          const x = item.x - 8;
+          const y = item.y - 8;
+          const w = width + 16;
+          const h = height + 16;
+
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([8, 5]);
+          ctx.strokeRect(x, y, w, h);
+          ctx.setLineDash([]);
+
+          // จุดจับ 4 มุม สำหรับขยาย/ย่อข้อความ
+          const handleSize = 14;
+          const handles = [
+            [x, y],
+            [x + w, y],
+            [x, y + h],
+            [x + w, y + h]
+          ];
+          ctx.fillStyle = '#22c55e';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          handles.forEach(([hx, hy]) => {
+            ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+            ctx.strokeRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+          });
+        }
+      });
+    }
+
+    function saveHistory() {
+      const snapshot = editCanvas.toDataURL('image/png');
+      historyStack = historyStack.slice(0, historyIndex + 1);
+      historyStack.push(snapshot);
+      historyIndex = historyStack.length - 1;
+      updateHistoryButtons();
+    }
+    function restoreHistory(index) {
+      if (index < 0 || index >= historyStack.length) return;
+      const image = new Image();
+      image.onload = function () {
+        ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+        ctx.drawImage(image, 0, 0);
+        historyIndex = index;
+        updateHistoryButtons();
+      };
+      image.src = historyStack[index];
+    }
+    function undoHistory() { if (historyIndex > 0) restoreHistory(historyIndex - 1); }
+    function redoHistory() { if (historyIndex < historyStack.length - 1) restoreHistory(historyIndex + 1); }
+    function updateHistoryButtons() {
+      undoEdit.disabled = historyIndex <= 0;
+      redoEdit.disabled = historyIndex >= historyStack.length - 1;
+    }
+
+    function getCanvasPoint(event) {
+      const rect = editCanvas.getBoundingClientRect();
+      const scaleX = editCanvas.width / rect.width;
+      const scaleY = editCanvas.height / rect.height;
+      return { x: (event.clientX - rect.left) * scaleX, y: (event.clientY - rect.top) * scaleY };
+    }
+
+    function getTextBox(item) {
+      ctx.font = item.font;
+      const width = ctx.measureText(item.text).width;
+      const height = item.size * 3;
+      return {
+        x: item.x - 8,
+        y: item.y - 8,
+        w: width + 16,
+        h: height + 16
+      };
+    }
+
+    function getResizeHandleAtPoint(point) {
+      if (selectedTextIndex < 0) return '';
+      const item = textObjects[selectedTextIndex];
+      const box = getTextBox(item);
+      const size = 20;
+      const handles = {
+        tl: { x: box.x, y: box.y },
+        tr: { x: box.x + box.w, y: box.y },
+        bl: { x: box.x, y: box.y + box.h },
+        br: { x: box.x + box.w, y: box.y + box.h }
+      };
+
+      for (const key in handles) {
+        const h = handles[key];
+        if (
+          point.x >= h.x - size / 2 &&
+          point.x <= h.x + size / 2 &&
+          point.y >= h.y - size / 2 &&
+          point.y <= h.y + size / 2
+        ) {
+          return key;
+        }
+      }
+      return '';
+    }
+
+    function findTextAtPoint(point) {
+      for (let i = textObjects.length - 1; i >= 0; i--) {
+        const item = textObjects[i];
+        const box = getTextBox(item);
+        if (
+          point.x >= box.x &&
+          point.x <= box.x + box.w &&
+          point.y >= box.y &&
+          point.y <= box.y + box.h
+        ) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    function renderVersionStrip() {
+      versionStrip.innerHTML = '';
+      if (!currentEdit) return;
+      currentEdit.box.imageHistory.forEach((src, index) => {
+        const item = document.createElement('div');
+        item.className = 'version-thumb' + (index === currentEdit.box.imageIndex ? ' active' : '');
+        item.innerHTML = `<img src="${src}" alt="version ${index + 1}"><span>V${index + 1}</span>`;
+        item.addEventListener('click', () => {
+          currentEdit.box.imageIndex = index;
+          currentEdit.img.src = src;
+          openEditor(src, currentEdit);
+        });
+        versionStrip.appendChild(item);
+      });
+    }
+
+    function updateBoxVersionUI(box, img, versionLabel, prevBtn, nextBtn) {
+      const count = box.imageHistory.length;
+      if (count <= 0) {
+        versionLabel.style.display = 'none';
+        prevBtn.style.display = 'none';
+        nextBtn.style.display = 'none';
+        return;
+      }
+      versionLabel.textContent = `V${box.imageIndex + 1}/${count}`;
+      versionLabel.style.display = 'block';
+      prevBtn.style.display = count > 1 ? 'block' : 'none';
+      nextBtn.style.display = count > 1 ? 'block' : 'none';
+      img.src = box.imageHistory[box.imageIndex];
+    }
+
+    function openEditor(src, editData) {
+      currentEdit = editData;
+      originalEditSrc = src;
+      const image = new Image();
+      image.onload = function () {
+        editCanvas.width = image.naturalWidth;
+        editCanvas.height = image.naturalHeight;
+        ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+        ctx.drawImage(image, 0, 0);
+        canvasBaseImage = image;
+        textObjects = [];
+        selectedTextIndex = -1;
+        historyStack = [];
+        historyIndex = -1;
+        editorView.style.display = 'block';
+        saveHistory();
+        setMode('move');
+        resetZoom();
+        renderVersionStrip();
+      };
+      image.src = src;
+    }
+
+    function closeEditorView() {
+      editorView.style.display = 'none';
+      currentEdit = null;
+      setMode('move');
+    }
+
+    function saveEditedImage() {
+      if (!currentEdit) return;
+      selectedTextIndex = -1;
+      redrawCanvas();
+      const dataUrl = editCanvas.toDataURL('image/png');
+      currentEdit.box.imageHistory.push(dataUrl);
+      currentEdit.box.imageIndex = currentEdit.box.imageHistory.length - 1;
+      currentEdit.img.src = dataUrl;
+      currentEdit.img.style.display = 'block';
+      currentEdit.placeholder.style.display = 'none';
+      currentEdit.removeBtn.style.display = 'block';
+      currentEdit.box.classList.add('has-image');
+      currentEdit.updateVersionUI();
+      closeEditorView();
+    }
+
+    function clearEdits() {
+      if (!originalEditSrc) return;
+      const image = new Image();
+      image.onload = function () {
+        ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+        ctx.drawImage(image, 0, 0);
+        canvasBaseImage = image;
+        textObjects = [];
+        selectedTextIndex = -1;
+        saveHistory();
+      };
+      image.src = originalEditSrc;
+    }
+
+    function clearImage(input, img, placeholder, removeBtn, box, versionLabel, prevBtn, nextBtn) {
+      input.value = '';
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      placeholder.style.display = 'flex';
+      removeBtn.style.display = 'none';
+      box.classList.remove('has-image');
+      box.imageHistory = [];
+      box.imageIndex = -1;
+      updateBoxVersionUI(box, img, versionLabel, prevBtn, nextBtn);
+    }
+
+    function showDeleteModal(deleteData) {
+      pendingDelete = deleteData;
+      deletePasswordInput.value = '';
+      deleteError.textContent = '';
+      deleteModal.style.display = 'flex';
+      setTimeout(() => deletePasswordInput.focus(), 50);
+    }
+    function hideDeleteModal() { deleteModal.style.display = 'none'; pendingDelete = null; deletePasswordInput.value = ''; deleteError.textContent = ''; }
+    function confirmDeleteImage() {
+      if (!pendingDelete) return;
+      if (!deleteUnlocked) {
+        if (deletePasswordInput.value !== deletePassword) { deleteError.textContent = 'รหัสไม่ถูกต้อง'; return; }
+        deleteUnlocked = true;
+      }
+      clearImage(pendingDelete.input, pendingDelete.img, pendingDelete.placeholder, pendingDelete.removeBtn, pendingDelete.box, pendingDelete.versionLabel, pendingDelete.prevBtn, pendingDelete.nextBtn);
+      hideDeleteModal();
+    }
+
+    for (let i = 1; i <= totalBoxes; i++) {
+      const storageKey = 'status_box_' + i;
+      const box = document.createElement('div');
+      box.className = 'upload-box';
+      box.imageHistory = [];
+      box.imageIndex = -1;
+      box.innerHTML = `
+        <div class="top-section">
+          <span class="number">${i}</span>
+          <button type="button" class="upload-btn">อัปโหลด</button>
+          <button type="button" class="remove-btn">ลบ</button>
+          <button type="button" class="prev-version">◀</button>
+          <button type="button" class="next-version">▶</button>
+          <span class="version-label"></span>
+          <img class="preview-img" alt="preview ${i}">
+          <div class="placeholder"><strong>อัปโหลดรูป</strong><span>กดปุ่ม "อัปโหลด" เท่านั้น</span></div>
+          <input type="file" accept="image/jpeg,image/png,image/webp">
+        </div>
+        <div class="bottom-section">
+          <div class="status-tracker">
+          <div class="status-title">สถานะงาน</div>
+          <div class="status-line">
+            <button type="button" class="status-step">ทำไฟล์งาน</button>
+            <button type="button" class="status-step">ไฟล์พร้อมปริ้น</button>
+            <button type="button" class="status-step">ปริ้นงาน</button>
+            <button type="button" class="status-step">อัดลาย</button>
+            <button type="button" class="status-step">ตัดเลเชอร์</button>
+            <button type="button" class="status-step">เย็บงาน</button>
+            <button type="button" class="status-step">รีดแพ็ค</button>
+            <button type="button" class="status-step">พร้อมส่ง</button>
+            <button type="button" class="status-step">เก็บเงิน</button>
+            <button type="button" class="status-step">ส่งงาน</button>
+          </div>
+        </div>
+        </div>
+      `;
+      const input = box.querySelector('input');
+      const img = box.querySelector('.preview-img');
+      const placeholder = box.querySelector('.placeholder');
+      const uploadBtn = box.querySelector('.upload-btn');
+      const removeBtn = box.querySelector('.remove-btn');
+      const prevBtn = box.querySelector('.prev-version');
+      const nextBtn = box.querySelector('.next-version');
+      const versionLabel = box.querySelector('.version-label');
+      const statusSteps = box.querySelectorAll('.status-step');
+      
+      // โหลดสถานะจาก localStorage
+      const savedStatus = localStorage.getItem(storageKey);
+      if (savedStatus !== null) {
+        const stepIndex = Number(savedStatus);
+        statusSteps.forEach((item, itemIndex) => {
+          item.classList.toggle('done', itemIndex < stepIndex);
+          item.classList.toggle('active', itemIndex === stepIndex);
+        });
+      }
+      const updateVersionUI = () => updateBoxVersionUI(box, img, versionLabel, prevBtn, nextBtn);
+
+      uploadBtn.addEventListener('click', function (event) {
+        event.preventDefault(); event.stopPropagation();
+
+        if (uploadUnlocked) {
+          input.click();
+          return;
+        }
+
+        pendingUploadInput = input;
+        uploadPasswordInput.value = '';
+        uploadError.textContent = '';
+        uploadModal.style.display = 'flex';
+        setTimeout(() => uploadPasswordInput.focus(), 50);
+      });
+
+      input.addEventListener('change', function () {
+        const file = input.files[0];
+        if (!file) return;
+        if (!allowedTypes.includes(file.type)) { alert('อัปโหลดได้เฉพาะไฟล์ JPG, PNG หรือ WebP เท่านั้น'); input.value = ''; return; }
+        if (file.size > maxFileSize) { alert('ไฟล์ใหญ่เกินไป กรุณาใช้ไฟล์ไม่เกิน 10MB'); input.value = ''; return; }
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          box.imageHistory = [event.target.result];
+          box.imageIndex = 0;
+          img.src = event.target.result;
+          img.style.display = 'block';
+          placeholder.style.display = 'none';
+          removeBtn.style.display = 'block';
+          box.classList.add('has-image');
+          updateVersionUI();
+        };
+        reader.readAsDataURL(file);
+      });
+
+      removeBtn.addEventListener('click', function (event) {
+        event.preventDefault(); event.stopPropagation();
+        if (!img.getAttribute('src')) return;
+        if (deleteUnlocked) { clearImage(input, img, placeholder, removeBtn, box, versionLabel, prevBtn, nextBtn); return; }
+        showDeleteModal({ input, img, placeholder, removeBtn, box, versionLabel, prevBtn, nextBtn });
+      });
+
+      prevBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (box.imageIndex > 0) { box.imageIndex--; updateVersionUI(); }
+      });
+      nextBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (box.imageIndex < box.imageHistory.length - 1) { box.imageIndex++; updateVersionUI(); }
+      });
+
+      statusSteps.forEach((step, stepIndex) => {
+        step.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          localStorage.setItem(storageKey, stepIndex);
+
+          statusSteps.forEach((item, itemIndex) => {
+            item.classList.toggle('done', itemIndex < stepIndex);
+            item.classList.toggle('active', itemIndex === stepIndex);
+          });
+        });
+      });
+
+      box.addEventListener('click', function (event) {
+        if (event.target.closest('button') || event.target.closest('.status-tracker')) return;
+        if (!img.getAttribute('src')) return;
+        openEditor(img.src, { input, img, placeholder, removeBtn, box, updateVersionUI });
+      });
+
+      uploadGrid.appendChild(box);
+    }
+
+    editCanvas.addEventListener('mousedown', function (event) {
+      event.preventDefault();
+
+      const pointForHit = getCanvasPoint(event);
+
+      // Move Tool: เลือก/ย้าย/ขยายตัวอักษรเท่านั้น
+      if (mode === 'moveTool') {
+        const hitIndex = findTextAtPoint(pointForHit);
+        selectedTextIndex = hitIndex;
+
+        const handle = getResizeHandleAtPoint(pointForHit);
+        if (handle && selectedTextIndex >= 0) {
+          isResizingText = true;
+          resizeHandle = handle;
+          resizeStartY = event.clientY;
+          resizeStartSize = textObjects[selectedTextIndex].size;
+          redrawCanvas();
+          return;
+        }
+
+        if (hitIndex >= 0) {
+          const item = textObjects[hitIndex];
+          isMovingText = true;
+          textOffsetX = pointForHit.x - item.x;
+          textOffsetY = pointForHit.y - item.y;
+          redrawCanvas();
+          return;
+        }
+
+        selectedTextIndex = -1;
+        redrawCanvas();
+        return;
+      }
+
+      // โหมดวาด
+      if (mode === 'draw') {
+        isDrawing = true;
+        const point = getCanvasPoint(event);
+        ctx.beginPath();
+        ctx.moveTo(point.x, point.y);
+        return;
+      }
+
+      // โหมดเพิ่มข้อความ (เฉพาะตอนคลิกพื้นที่ว่าง)
+      if (mode === 'text') {
+        pendingTextPoint = pointForHit;
+        textInput.value = '';
+        textModal.style.display = 'flex';
+        setTimeout(() => textInput.focus(), 50);
+        return;
+      }
+
+      // เลื่อนภาพ
+      isDragging = true;
+      startX = event.clientX - moveX;
+      startY = event.clientY - moveY;
+    });
+
+    window.addEventListener('mousemove', function (event) {
+      if (event.buttons === 0) return;
+      if (isDrawing && mode === 'draw') {
+        const point = getCanvasPoint(event);
+        ctx.lineWidth = Number(sizePicker.value);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = colorPicker.value;
+        ctx.globalAlpha = 0.9;
+        ctx.shadowColor = colorPicker.value;
+        ctx.shadowBlur = 2;
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        return;
+      }
+      if (isResizingText && selectedTextIndex >= 0) {
+        const item = textObjects[selectedTextIndex];
+        const delta = resizeHandle.includes('t') ? (resizeStartY - event.clientY) : (event.clientY - resizeStartY);
+        item.size = Math.max(2, Math.min(120, resizeStartSize + delta * 0.15));
+        item.font = `bold ${item.size * 3}px ${fontFamily.value}`;
+        redrawCanvas();
+        return;
+      }
+
+      if (isMovingText && selectedTextIndex >= 0) {
+        const point = getCanvasPoint(event);
+        const item = textObjects[selectedTextIndex];
+        if (event.altKey) {
+          item.rotation = (item.rotation||0) + event.movementX * 0.5;
+        } else {
+          item.x = point.x - textOffsetX;
+          item.y = point.y - textOffsetY;
+        }
+        redrawCanvas();
+        return;
+      }
+      if (!isDragging) return;
+      moveX = event.clientX - startX;
+      moveY = event.clientY - startY;
+      updateZoom();
+    });
+
+    window.addEventListener('mouseup', function () {
+      // ⭐ ถ้ามีการวาด ให้แปลงเป็น base image (ไม่หายตอนใช้ Move Tool)
+      if (isDrawing) {
+        const img = new Image();
+        img.onload = function () {
+          canvasBaseImage = img;
+        };
+        img.src = editCanvas.toDataURL('image/png');
+        saveHistory();
+      }
+
+      if (isMovingText || isResizingText) saveHistory();
+
+      isDragging = false;
+      isDrawing = false;
+      isMovingText = false;
+      isResizingText = false;
+      resizeHandle = '';
+    });
+
+    confirmText.addEventListener('click', function () {
+      const text = textInput.value.trim();
+      if (!text || !pendingTextPoint) return;
+      const textSize = Number(sizePicker.value);
+      const newText = {
+        text,
+        x: pendingTextPoint.x,
+        y: pendingTextPoint.y,
+        color: colorPicker.value,
+        size: textSize,
+        font: `bold ${textSize * 3}px ${fontFamily.value}`,
+        rotation: 0,
+        stroke: strokeToggle.checked,
+        strokeWidth: Number(strokeWidth.value),
+        shadow: shadowToggle.checked
+      };
+      textObjects.push(newText);
+      selectedTextIndex = textObjects.length - 1;
+      redrawCanvas();
+      saveHistory();
+      textModal.style.display = 'none';
+      pendingTextPoint = null;
+    });
+    cancelText.addEventListener('click', function () { textModal.style.display = 'none'; pendingTextPoint = null; });
+    textInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') confirmText.click(); });
+
+    moveToolBtn.addEventListener('click', () => setMode(mode === 'moveTool' ? 'move' : 'moveTool'));
+    drawModeBtn.addEventListener('click', () => setMode(mode === 'draw' ? 'move' : 'draw'));
+    textModeBtn.addEventListener('click', () => setMode(mode === 'text' ? 'move' : 'text'));
+    
+    saveEdit.addEventListener('click', saveEditedImage);
+    clearEdit.addEventListener('click', clearEdits);
+    closeEditor.addEventListener('click', closeEditorView);
+    zoomInBtn.addEventListener('click', zoomIn);
+    zoomOutBtn.addEventListener('click', zoomOut);
+    resetZoomBtn.addEventListener('click', resetZoom);
+    undoEdit.addEventListener('click', undoHistory);
+    redoEdit.addEventListener('click', redoHistory);
+    editorView.addEventListener('wheel', function (event) { event.preventDefault(); event.deltaY < 0 ? zoomIn() : zoomOut(); }, { passive: false });
+
+    downloadZip.addEventListener('click', function () {
+      if (!currentEdit || currentEdit.box.imageHistory.length === 0) return;
+      const html = currentEdit.box.imageHistory.map((src, index) => `
+        <a download="image-v${index + 1}.png" href="${src}">ดาวน์โหลด V${index + 1}</a>
+      `).join('<br>');
+      const win = window.open('', '_blank');
+      win.document.write(`<meta charset="UTF-8"><h2>ดาวน์โหลดรูปทุกเวอร์ชัน</h2>${html}<p>หมายเหตุ: เว็บไฟล์เดียวไม่สามารถสร้าง ZIP จริงได้โดยไม่ใช้ไลบรารีภายนอก จึงแยกปุ่มดาวน์โหลดแต่ละเวอร์ชันให้แทน</p>`);
+      win.document.close();
+    });
+
+    confirmDelete.addEventListener('click', function (event) { event.preventDefault(); confirmDeleteImage(); });
+    cancelDelete.addEventListener('click', function (event) { event.preventDefault(); hideDeleteModal(); });
+    deletePasswordInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') confirmDeleteImage(); });
+    deleteModal.addEventListener('click', function (event) { if (event.target === deleteModal) hideDeleteModal(); });
+
+    // Upload modal
+    confirmUpload.addEventListener('click', function () {
+      if (uploadPasswordInput.value !== deletePassword) {
+        uploadError.textContent = 'รหัสไม่ถูกต้อง';
+        return;
+      }
+      uploadUnlocked = true;
+      uploadModal.style.display = 'none';
+      if (pendingUploadInput) pendingUploadInput.click();
+    });
+
+    cancelUpload.addEventListener('click', function () {
+      uploadModal.style.display = 'none';
+      pendingUploadInput = null;
+    });
+
+    uploadPasswordInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') confirmUpload.click();
+    });
+
+    uploadModal.addEventListener('click', function (e) {
+      if (e.target === uploadModal) uploadModal.style.display = 'none';
+    });
+
+    window.addEventListener('dragover', function (event) { event.preventDefault(); });
+    window.addEventListener('drop', function (event) { event.preventDefault(); alert('กรุณากดปุ่ม "อัปโหลด" เท่านั้นเพื่อเลือกภาพ'); });
+  </script>
+</body>
+</html>
